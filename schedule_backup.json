@@ -1,0 +1,26 @@
+{
+  "app": "EasyRemind",
+  "formatVersion": 1,
+  "exportedAt": "2026-10-07T13:00:00",
+  "classes": [
+    { "subjectName": "Environmental Science", "instructor": "", "room": "", "days": [1], "startMin": 420, "endMin": 600, "reminderMinutes": 15, "isEnabled": true },
+    { "subjectName": "Networking 2", "instructor": "", "room": "", "days": [1], "startMin": 600, "endMin": 780, "reminderMinutes": 15, "isEnabled": true },
+    { "subjectName": "Integrative Programming", "instructor": "", "room": "", "days": [1], "startMin": 840, "endMin": 900, "reminderMinutes": 15, "isEnabled": true },
+    { "subjectName": "System Integration", "instructor": "", "room": "", "days": [1], "startMin": 900, "endMin": 960, "reminderMinutes": 15, "isEnabled": true },
+    { "subjectName": "IT Service Management", "instructor": "", "room": "", "days": [2], "startMin": 480, "endMin": 540, "reminderMinutes": 15, "isEnabled": true },
+    { "subjectName": "Mobile Application Development", "instructor": "", "room": "", "days": [2], "startMin": 540, "endMin": 600, "reminderMinutes": 15, "isEnabled": true },
+    { "subjectName": "System Integration and Architecture 1", "instructor": "", "room": "", "days": [2], "startMin": 600, "endMin": 780, "reminderMinutes": 15, "isEnabled": true },
+    { "subjectName": "Fundamentals of Database", "instructor": "", "room": "", "days": [2], "startMin": 840, "endMin": 900, "reminderMinutes": 15, "isEnabled": true },
+    { "subjectName": "Networking 2", "instructor": "", "room": "", "days": [2], "startMin": 900, "endMin": 960, "reminderMinutes": 15, "isEnabled": true },
+    { "subjectName": "Programming and Technologies 1", "instructor": "", "room": "", "days": [2], "startMin": 960, "endMin": 1140, "reminderMinutes": 15, "isEnabled": true },
+    { "subjectName": "IT Service Management", "instructor": "", "room": "", "days": [3], "startMin": 420, "endMin": 600, "reminderMinutes": 15, "isEnabled": true },
+    { "subjectName": "Fundamentals of Database", "instructor": "", "room": "", "days": [3], "startMin": 600, "endMin": 780, "reminderMinutes": 15, "isEnabled": true },
+    { "subjectName": "Integrative Programming", "instructor": "", "room": "", "days": [3], "startMin": 840, "endMin": 900, "reminderMinutes": 15, "isEnabled": true },
+    { "subjectName": "System Integration", "instructor": "", "room": "", "days": [3], "startMin": 900, "endMin": 960, "reminderMinutes": 15, "isEnabled": true },
+    { "subjectName": "IT Service Management", "instructor": "", "room": "", "days": [4], "startMin": 480, "endMin": 540, "reminderMinutes": 15, "isEnabled": true },
+    { "subjectName": "Mobile Application Development", "instructor": "", "room": "", "days": [4], "startMin": 540, "endMin": 600, "reminderMinutes": 15, "isEnabled": true },
+    { "subjectName": "Fundamentals of Database", "instructor": "", "room": "", "days": [4], "startMin": 840, "endMin": 900, "reminderMinutes": 15, "isEnabled": true },
+    { "subjectName": "Networking 2", "instructor": "", "room": "", "days": [4], "startMin": 900, "endMin": 960, "reminderMinutes": 15, "isEnabled": true },
+    { "subjectName": "Mobile Application Development", "instructor": "", "room": "", "days": [5], "startMin": 600, "endMin": 780, "reminderMinutes": 15, "isEnabled": true }
+  ]
+}
