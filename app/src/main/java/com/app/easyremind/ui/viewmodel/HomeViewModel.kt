@@ -10,6 +10,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDateTime
@@ -46,22 +47,29 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     init {
         viewModelScope.launch {
             repository.classesFlow.collect { classes ->
-                _uiState.value = _uiState.value.copy(classes = classes)
+                _uiState.update { state ->
+                    state.copy(
+                        classes = classes,
+                        next = ScheduleMath.nextClass(classes, state.today),
+                    )
+                }
             }
         }
         viewModelScope.launch {
             repository.settingsFlow.collect { settings ->
-                _uiState.value = _uiState.value.copy(
-                    settings = settings ?: SettingsEntity(),
-                )
+                _uiState.update { state ->
+                    state.copy(settings = settings ?: SettingsEntity())
+                }
             }
         }
         viewModelScope.launch {
             ticker().collect { now ->
-                _uiState.value = _uiState.value.copy(
-                    today = now,
-                    next = ScheduleMath.nextClass(_uiState.value.classes, now),
-                )
+                _uiState.update { state ->
+                    state.copy(
+                        today = now,
+                        next = ScheduleMath.nextClass(state.classes, now),
+                    )
+                }
             }
         }
     }

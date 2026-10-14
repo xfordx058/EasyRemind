@@ -23,7 +23,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun update(transform: (SettingsEntity) -> SettingsEntity) {
-        val current = _settings.value ?: return
+        val current = _settings.value ?: SettingsEntity()
         val next = transform(current)
         viewModelScope.launch {
             repository.updateSettings(next)

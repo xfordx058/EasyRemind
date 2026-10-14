@@ -1,5 +1,12 @@
 package com.app.easyremind.ui.screens
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,21 +21,32 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.app.easyremind.data.ClassEntity
 import com.app.easyremind.ui.components.NeoButton
 import com.app.easyremind.ui.components.NeoCard
@@ -36,7 +54,8 @@ import com.app.easyremind.ui.components.NeoIconButton
 import com.app.easyremind.ui.components.EmptyState
 import com.app.easyremind.ui.viewmodel.HomeUiState
 import com.app.easyremind.util.ScheduleMath
-import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun HomeScreen(
@@ -155,44 +174,48 @@ private fun NextClassHero(
     onOpenClass: (Long) -> Unit,
     onOpenSchedule: () -> Unit,
 ) {
+    val primary = MaterialTheme.colorScheme.primary
     when (val next = state.next) {
-        is ScheduleMath.NextClass.Current -> HeroCard(
-            label = "CURRENT CLASS",
-            clazz = next.clazz,
-            caption = "Ends in ${ScheduleMath.formatDuration(next.remainingMin)}",
-            accent = MaterialTheme.colorScheme.primary,
-            onClick = { onOpenClass(next.clazz.id) },
-        )
+        is ScheduleMath.NextClass.Current -> {
+            val clazz = next.clazz
+            val totalMin = (clazz.endMin - clazz.startMin).coerceAtLeast(1)
+            HeroCard(
+                label = "CURRENT CLASS",
+                live = true,
+                clazz = clazz,
+                caption = "Ends in ${ScheduleMath.formatDuration(next.remainingMin)}",
+                accent = primary,
+                progress = ((state.nowMin - clazz.startMin).toFloat() / totalMin).coerceIn(0f, 1f),
+                onClick = { onOpenClass(clazz.id) },
+            )
+        }
         is ScheduleMath.NextClass.Upcoming -> HeroCard(
             label = if (next.date == state.today.toLocalDate()) "NEXT CLASS" else "UP NEXT",
+            live = false,
             clazz = next.clazz,
             caption = buildString {
                 if (next.date != state.today.toLocalDate()) {
-                    append(next.date.format(java.time.format.DateTimeFormatter.ofPattern("EEEE", java.util.Locale.US)))
+                    append(next.date.format(DateTimeFormatter.ofPattern("EEEE", Locale.US)))
                     append(" · ")
                 }
                 append("Starts in ")
                 append(ScheduleMath.formatDuration(next.startsInMin))
             },
-            accent = MaterialTheme.colorScheme.primary,
+            accent = primary,
+            progress = null,
             onClick = { onOpenClass(next.clazz.id) },
         )
         ScheduleMath.NextClass.NoClasses -> {
-            if (state.todaysClasses.isEmpty()) {
-                // no more classes today; find first future class
-                val future = state.classes
-                    .filter { it.isEnabled }
-                    .flatMap { c ->
-                        ScheduleMath.daySetOf(c.daysBitmask).map { d -> c to d }.take(1)
-                    }
-                EmptyHero(
-                    title = "You're all done! ✓",
-                    subtitle = "No more classes scheduled for today.\nEnjoy your free time!",
-                    onClick = onOpenSchedule,
-                )
-            } else {
-                Box(Modifier.fillMaxWidth()) {}
-            }
+            val anyEnabled = state.classes.any { it.isEnabled }
+            EmptyHero(
+                title = if (anyEnabled) "You're all done! ✓" else "Nothing scheduled",
+                subtitle = if (anyEnabled) {
+                    "No more classes scheduled for today.\nEnjoy your free time!"
+                } else {
+                    "No classes are turned on right now.\nEnable one from Schedule."
+                },
+                onClick = onOpenSchedule,
+            )
         }
     }
 }
@@ -202,45 +225,145 @@ private fun HeroCard(
     label: String,
     clazz: ClassEntity,
     caption: String,
-    accent: androidx.compose.ui.graphics.Color,
+    accent: Color,
+    live: Boolean,
+    progress: Float?,
     onClick: () -> Unit,
 ) {
-    NeoCard(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = accent,
-            fontWeight = FontWeight.Bold,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = clazz.subjectName,
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-            fontWeight = FontWeight.Bold,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = ScheduleMath.formatTimeRange(clazz.startMin, clazz.endMin),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (clazz.room.isNotBlank()) {
-            Spacer(Modifier.height(2.dp))
+    NeoCard(
+        modifier = Modifier.fillMaxWidth(),
+        color = if (progress != null) accent.copy(alpha = 0.10f)
+        else MaterialTheme.colorScheme.surface,
+        contentPadding = 18.dp,
+        onClick = onClick,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (live) {
+                    LiveDot(accent = accent)
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = accent,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp,
+                )
+            }
             Text(
-                text = clazz.room,
-                style = MaterialTheme.typography.bodyMedium,
+                text = ScheduleMath.formatTimeRange(clazz.startMin, clazz.endMin),
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(10.dp))
         Text(
-            text = caption,
-            style = MaterialTheme.typography.bodyMedium,
-            color = accent,
-            fontWeight = FontWeight.SemiBold,
+            text = clazz.subjectName,
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onBackground,
+            fontWeight = FontWeight.Bold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
+        ClassMetaRow(clazz = clazz)
+        Spacer(Modifier.height(14.dp))
+        if (progress != null) {
+            val animatedProgress by animateFloatAsState(
+                targetValue = progress,
+                animationSpec = tween(durationMillis = 700, easing = LinearEasing),
+                label = "classProgress",
+            )
+            LinearProgressIndicator(
+                progress = { animatedProgress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                color = accent,
+                trackColor = accent.copy(alpha = 0.18f),
+                strokeCap = StrokeCap.Round,
+            )
+            Spacer(Modifier.height(10.dp))
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = caption,
+                style = MaterialTheme.typography.bodyMedium,
+                color = accent,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (progress != null) {
+                Text(
+                    text = "${(progress * 100).toInt()}% done",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
+}
+
+@Composable
+private fun ClassMetaRow(clazz: ClassEntity) {
+    val parts = listOfNotNull(
+        clazz.room.takeIf { it.isNotBlank() }?.let { Icons.Default.Place to it },
+        clazz.instructor.takeIf { it.isNotBlank() }?.let { Icons.Default.Person to it },
+    )
+    if (parts.isEmpty()) return
+    Spacer(Modifier.height(8.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        parts.forEachIndexed { index, (icon, text) ->
+            if (index > 0) Spacer(Modifier.width(14.dp))
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(14.dp),
+            )
+            Spacer(Modifier.width(5.dp))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f, fill = false),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LiveDot(accent: Color) {
+    val transition = rememberInfiniteTransition(label = "liveDot")
+    val dotAlpha by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.35f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "liveDotAlpha",
+    )
+    Box(
+        modifier = Modifier
+            .size(8.dp)
+            .alpha(dotAlpha)
+            .clip(CircleShape)
+            .background(accent),
+    )
 }
 
 @Composable

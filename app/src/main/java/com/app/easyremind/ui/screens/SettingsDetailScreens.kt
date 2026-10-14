@@ -10,17 +10,29 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.SettingsBrightness
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -244,39 +256,61 @@ fun AppearanceScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
         NeoCard(Modifier.fillMaxWidth()) {
             Text("Choose Theme", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(6.dp))
-            ThemeOption("Light", selected = s.theme == "light", onClick = {
-                viewModel.update { it.copy(theme = "light") }
-            })
-            ThemeOption("Dark", selected = s.theme == "dark", onClick = {
-                viewModel.update { it.copy(theme = "dark") }
-            })
-            ThemeOption("System Default", selected = s.theme == "system", onClick = {
-                viewModel.update { it.copy(theme = "system") }
-            })
+            ThemeOption(
+                label = "Light",
+                icon = Icons.Outlined.LightMode,
+                selected = s.theme == "light",
+                onClick = { viewModel.update { it.copy(theme = "light") } },
+            )
+            ThemeOption(
+                label = "Dark",
+                icon = Icons.Outlined.DarkMode,
+                selected = s.theme == "dark",
+                onClick = { viewModel.update { it.copy(theme = "dark") } },
+            )
+            ThemeOption(
+                label = "System Default",
+                icon = Icons.Outlined.SettingsBrightness,
+                selected = s.theme == "system",
+                onClick = { viewModel.update { it.copy(theme = "system") } },
+            )
         }
     }
 }
 
 @Composable
-private fun ThemeOption(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun ThemeOption(label: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
+    val contentColor = if (selected) {
+        MaterialTheme.colorScheme.onSecondaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (selected) MaterialTheme.colorScheme.secondaryContainer
+                else Color.Transparent
+            )
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .heightIn(min = 48.dp)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = if (selected) "●" else "○",
-            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 20.sp,
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = contentColor,
         )
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(12.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onBackground,
+            color = if (selected) contentColor else MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.weight(1f),
         )
+        RadioButton(selected = selected, onClick = null)
     }
 }
 

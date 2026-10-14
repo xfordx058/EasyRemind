@@ -18,8 +18,10 @@ class EasyRemindApp : Application() {
         container = AppContainer(this)
         container.notifier.createChannels()
 
-        // Restore reminder scheduling after app updates or process restart.
+        // Restore reminder scheduling after app updates or process restart,
+        // and make sure the settings row exists so settings writes never no-op.
         appScope.launch {
+            container.repository.getSettings()
             container.repository.rescheduleAll()
         }
     }
