@@ -21,14 +21,20 @@ class ReminderScheduler(private val appContext: Context) {
             cancelClass(clazz.id)
             return
         }
+        val lead = clazz.reminderMinutes.coerceAtLeast(0)
         for (day in ScheduleMath.daySetOf(clazz.daysBitmask)) {
-            val occurrence = ScheduleMath.nextOccurrence(fromNow, day, clazz.startMin)
-            val occurrenceLdt = occurrence.atTime(clazz.startMin / 60, clazz.startMin % 60)
-            if (occurrenceLdt.isBefore(fromNow)) continue
-            val reminderLocal = occurrenceLdt.minusMinutes(clazz.reminderMinutes.toLong())
-            if (reminderLocal.isAfter(fromNow) && clazz.reminderMinutes >= 0) {
-                setReminder(clazz, day, occurrence.toEpochDay(), reminderLocal)
+            var occurrence = ScheduleMath.nextOccurrence(fromNow, day, clazz.startMin, lead)
+            fun reminderTime(date: java.time.LocalDate) =
+                ScheduleMath.atTimeOn(date, clazz.startMin).minusMinutes(lead.toLong())
+
+            var reminderLocal = reminderTime(occurrence)
+            if (!reminderLocal.isAfter(fromNow)) {
+                // The ICS-style day matched but seconds put the reminder just
+                // behind us: wait for the following week instead of dropping it.
+                occurrence = occurrence.plusWeeks(1)
+                reminderLocal = reminderTime(occurrence)
             }
+            setReminder(clazz, day, occurrence.toEpochDay(), reminderLocal)
         }
     }
 

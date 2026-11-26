@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             AppTheme {
-                EasyRemindRoot()
+                EasyRemindRoot(onExit = { finish() })
             }
         }
     }

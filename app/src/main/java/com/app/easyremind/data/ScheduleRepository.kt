@@ -5,7 +5,6 @@ import com.app.easyremind.util.ScheduleMath
 import com.app.easyremind.util.Validation
 import kotlinx.coroutines.flow.Flow
 import org.json.JSONArray
-import org.json.JSONException
 import org.json.JSONObject
 import java.time.DayOfWeek
 import java.time.LocalDateTime
@@ -58,6 +57,9 @@ class ScheduleRepository(
             return SaveResult.Failed("Room must be under ${Validation.MAX_ROOM} characters.")
         }
         if (clazz.daysBitmask == 0) return SaveResult.Failed("Select at least one day.")
+        if (clazz.startMin !in 0 until 1440 || clazz.endMin !in 1..1440) {
+            return SaveResult.Failed("Select a valid time range.")
+        }
         if (clazz.endMin <= clazz.startMin) {
             return SaveResult.Failed("End time must be later than start time.")
         }
@@ -79,11 +81,13 @@ class ScheduleRepository(
             updatedAt = System.currentTimeMillis(),
         )
         if (isNew) {
-            val savedId = db.classDao().insert(updated)
-            reminderScheduler.rescheduleClass(updated.copy(id = savedId))
+            // Auto-generated keys only kick in for id == 0L. A negative id is
+            // the UI's "new class" sentinel and must never be stored as-is.
+            val savedId = db.classDao().insert(updated.copy(id = 0L))
+            syncReminder(updated.copy(id = savedId))
         } else {
             db.classDao().update(updated)
-            reminderScheduler.rescheduleClass(updated)
+            syncReminder(updated)
         }
         return SaveResult.Ok
     }
@@ -96,12 +100,24 @@ class ScheduleRepository(
     suspend fun setEnabled(clazz: ClassEntity, enabled: Boolean) {
         val updated = clazz.copy(isEnabled = enabled, updatedAt = System.currentTimeMillis())
         db.classDao().update(updated)
-        reminderScheduler.rescheduleClass(updated)
+        syncReminder(updated)
     }
 
     suspend fun rescheduleAll() {
-        for (clazz in db.classDao().getAll()) {
+        val classes = db.classDao().getAll()
+        if (!getSettings().notificationsEnabled) {
+            classes.forEach { reminderScheduler.cancelClass(it.id) }
+            return
+        }
+        classes.forEach { reminderScheduler.rescheduleClass(it) }
+    }
+
+    /** Keeps alarms in sync with both the class switch and the global setting. */
+    private suspend fun syncReminder(clazz: ClassEntity) {
+        if (clazz.isEnabled && getSettings().notificationsEnabled) {
             reminderScheduler.rescheduleClass(clazz)
+        } else {
+            reminderScheduler.cancelClass(clazz.id)
         }
     }
 
@@ -164,10 +180,13 @@ class ScheduleRepository(
                 if (subject.isEmpty()) {
                     return ImportResult.Error("Class ${i + 1} is missing a subject.")
                 }
+                if (subject.length > Validation.MAX_SUBJECT) {
+                    return ImportResult.Error("Class \"$subject\" has a subject that is too long.")
+                }
                 if (days.isEmpty()) {
                     return ImportResult.Error("Class \"$subject\" has no days selected.")
                 }
-                if (startMin < 0 || endMin <= startMin) {
+                if (startMin !in 0 until 1440 || endMin !in 1..1440 || endMin <= startMin) {
                     return ImportResult.Error("Class \"$subject\" has an invalid time range.")
                 }
                 imported += ClassEntity(
@@ -183,6 +202,9 @@ class ScheduleRepository(
                 )
             }
 
+            // Cancel alarms for the old schedule before replacing the rows,
+            // otherwise their pending intents keep firing after the import.
+            db.classDao().getAll().forEach { reminderScheduler.cancelClass(it.id) }
             db.classDao().clearAll()
             for (c in imported) {
                 db.classDao().insert(c)
@@ -192,8 +214,8 @@ class ScheduleRepository(
             }
             rescheduleAll()
             ImportResult.Success(imported.size)
-        } catch (e: JSONException) {
-            ImportResult.Error("The backup file could not be read: ${e.message ?: "invalid JSON"}")
+        } catch (e: Exception) {
+            ImportResult.Error("The backup file could not be read: ${e.message ?: "invalid file"}")
         }
     }
 

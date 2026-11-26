@@ -81,7 +81,6 @@ class TimerStateStore(context: Context) {
     fun pause(nowMs: Long = System.currentTimeMillis()) {
         if (status != TimerStatus.Running) return
         remainingWhenPausedMs = (endAtMs - nowMs).coerceAtLeast(0L)
-        totalMs = totalMs
         status = TimerStatus.Paused
     }
 

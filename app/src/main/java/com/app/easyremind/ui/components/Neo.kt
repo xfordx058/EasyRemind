@@ -1,8 +1,12 @@
 package com.app.easyremind.ui.components
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,16 +20,20 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -93,46 +101,93 @@ fun NeoButton(
     containerColor: Color = MaterialTheme.colorScheme.primary,
     contentColor: Color = MaterialTheme.colorScheme.onPrimary,
     shape: Shape = LargeShape,
+    leadingIcon: @Composable (() -> Unit)? = null,
 ) {
     val (dark, _) = neoShadowColors()
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed && enabled) 0.98f else 1f,
+        animationSpec = tween(durationMillis = 140, easing = FastOutSlowInEasing),
+        label = "buttonPress",
+    )
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(56.dp)
+            .scale(scale)
             .softCard(shape, dark, Color.Transparent, offset = 3.dp, elevation = 5.dp)
             .background(containerColor, shape)
             .clip(shape)
-            .clickable(enabled = enabled) { onClick() },
+            .clickable(
+                enabled = enabled,
+                interactionSource = interaction,
+                indication = null,
+                onClick = onClick,
+            ),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = text,
-            color = contentColor.copy(alpha = if (enabled) 1f else 0.5f),
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (leadingIcon != null) {
+                CompositionLocalProvider(LocalContentColor provides contentColor) {
+                    leadingIcon()
+                }
+            }
+            Text(
+                text = text,
+                color = contentColor.copy(alpha = if (enabled) 1f else 0.5f),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
     }
 }
 
 @Composable
 fun NeoIconButton(
     icon: @Composable () -> Unit,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     size: Dp = 48.dp,
     shape: Shape = PillShape,
+    containerColor: Color = MaterialTheme.colorScheme.surface,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    enabled: Boolean = true,
 ) {
     val (dark, light) = neoShadowColors()
-    Box(
-        modifier = modifier
-            .size(size)
-            .softCard(shape, dark, light, offset = 3.dp, elevation = 6.dp)
-            .background(MaterialTheme.colorScheme.surface, shape)
-            .clip(shape)
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center,
-    ) {
-        icon()
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed && enabled && onClick != null) 0.94f else 1f,
+        animationSpec = tween(durationMillis = 140, easing = FastOutSlowInEasing),
+        label = "iconButtonPress",
+    )
+    var base = modifier
+        .size(size)
+        .scale(scale)
+        .softCard(shape, dark, light, offset = 3.dp, elevation = 6.dp)
+        .background(
+            if (enabled) containerColor else containerColor.copy(alpha = 0.5f),
+            shape,
+        )
+        .clip(shape)
+    if (onClick != null) {
+        base = base.clickable(
+            enabled = enabled,
+            interactionSource = interaction,
+            indication = null,
+            onClick = onClick,
+        )
+    }
+    Box(modifier = base, contentAlignment = Alignment.Center) {
+        // Icons without an explicit tint inherit a color that always contrasts
+        // with the button background. Callers can still override with a tint.
+        CompositionLocalProvider(LocalContentColor provides contentColor) {
+            icon()
+        }
     }
 }
 
@@ -245,7 +300,12 @@ fun EmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(24.dp))
-        NeoIconButton(icon = icon, onClick = {}, size = 88.dp, shape = HeroShape)
+        NeoIconButton(
+            icon = icon,
+            size = 88.dp,
+            shape = HeroShape,
+            contentColor = MaterialTheme.colorScheme.primary,
+        )
         Spacer(Modifier.height(20.dp))
         Text(
             text = title,

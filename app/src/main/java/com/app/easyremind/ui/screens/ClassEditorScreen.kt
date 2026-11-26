@@ -1,5 +1,6 @@
 package com.app.easyremind.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -31,10 +33,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Book
+import androidx.compose.material.icons.filled.MeetingRoom
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import com.app.easyremind.data.ClassEntity
 import com.app.easyremind.data.ScheduleRepository
+import com.app.easyremind.ui.components.animateEnter
 import com.app.easyremind.ui.components.NeoButton
 import com.app.easyremind.ui.components.NeoConflictDialog
 import com.app.easyremind.ui.components.NeoDaySelector
@@ -70,7 +77,13 @@ fun ClassEditorScreen(
     var startPicker by remember { mutableStateOf(false) }
     var endPicker by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var successMessage by remember { mutableStateOf<String?>(null) }
     var conflict by remember { mutableStateOf<List<ClassEntity>?>(null) }
+    var showDiscard by remember { mutableStateOf(false) }
+
+    val handleBack: () -> Unit = {
+        if (viewModel.hasUnsavedChanges()) showDiscard = true else onBack()
+    }
 
     Column(
         modifier = modifier
@@ -80,10 +93,11 @@ fun ClassEditorScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 6.dp),
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+                .animateEnter(delayMs = 0),
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onBack) {
+            IconButton(onClick = handleBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
@@ -102,7 +116,8 @@ fun ClassEditorScreen(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 20.dp)
+                .animateEnter(delayMs = 80),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             NeoLabeledField(
@@ -110,6 +125,14 @@ fun ClassEditorScreen(
                 value = form.subjectName,
                 onValueChange = viewModel::onSubjectChange,
                 placeholder = "e.g. Mobile Application Development",
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Book,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                },
             )
 
             NeoLabeledField(
@@ -117,6 +140,14 @@ fun ClassEditorScreen(
                 value = form.instructor,
                 onValueChange = viewModel::onInstructorChange,
                 placeholder = "Optional",
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                },
             )
 
             NeoLabeledField(
@@ -124,6 +155,14 @@ fun ClassEditorScreen(
                 value = form.room,
                 onValueChange = viewModel::onRoomChange,
                 placeholder = "e.g. Room 204",
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.MeetingRoom,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                },
             )
 
             NeoDaySelector(
@@ -143,23 +182,45 @@ fun ClassEditorScreen(
                 onClick = { endPicker = true },
             )
 
-            val reminderIndex = reminderLabels.indexOfFirst { it.second == form.reminderMinutes }
+            // Older backups may carry a reminder value outside the presets.
+            // Keep it visible instead of silently displaying "At class start".
+            val reminderOptions = if (reminderLabels.any { it.second == form.reminderMinutes }) {
+                reminderLabels
+            } else {
+                reminderLabels + ("${form.reminderMinutes} minutes before" to form.reminderMinutes)
+            }
+            val reminderIndex = reminderOptions.indexOfFirst { it.second == form.reminderMinutes }
                 .coerceAtLeast(0)
             NeoDropdown(
                 label = "Reminder",
-                value = reminderLabels[reminderIndex].first,
-                options = reminderLabels.map { it.first },
-                onSelect = { index -> viewModel.setReminder(reminderLabels[index].second) },
+                value = reminderOptions[reminderIndex].first,
+                options = reminderOptions.map { it.first },
+                onSelect = { index -> viewModel.setReminder(reminderOptions[index].second) },
             )
 
             Spacer(Modifier.height(4.dp))
             NeoButton(
-                text = if (form.isNew) "Save Class" else "Save Changes",
-                enabled = form.loaded,
+                text = when {
+                    !form.loaded -> "Loading..."
+                    form.isNew -> "Save Class"
+                    else -> "Save Changes"
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Save,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
+                },
+                enabled = form.loaded && !form.loadFailed,
                 onClick = {
                     scope.launch {
                         when (val result = viewModel.save()) {
-                            ScheduleRepository.SaveResult.Ok -> onSaved()
+                            ScheduleRepository.SaveResult.Ok -> successMessage = if (form.isNew) {
+                                "Class added successfully."
+                            } else {
+                                "Class updated successfully."
+                            }
                             is ScheduleRepository.SaveResult.Failed -> errorMessage = result.message
                             is ScheduleRepository.SaveResult.Conflict -> conflict = result.conflicts
                         }
@@ -192,6 +253,24 @@ fun ClassEditorScreen(
             confirmText = "OK",
             onConfirm = { errorMessage = null },
             onDismiss = { errorMessage = null },
+            showDismissButton = false,
+        )
+    }
+
+    successMessage?.let { message ->
+        NeoMessageDialog(
+            title = "Success",
+            message = message,
+            confirmText = "OK",
+            onConfirm = {
+                successMessage = null
+                onSaved()
+            },
+            onDismiss = {
+                successMessage = null
+                onSaved()
+            },
+            showDismissButton = false,
         )
     }
 
@@ -203,6 +282,38 @@ fun ClassEditorScreen(
             onDismiss = { conflict = null },
         )
     }
+
+    if (form.loadFailed) {
+        NeoMessageDialog(
+            title = "Class not found",
+            message = "This class was deleted or is no longer available.",
+            confirmText = "Go Back",
+            onConfirm = onBack,
+            onDismiss = onBack,
+            showDismissButton = false,
+        )
+    }
+
+    if (showDiscard) {
+        NeoMessageDialog(
+            title = "Discard changes?",
+            message = "Your unsaved changes to this class will be lost.",
+            confirmText = "Discard",
+            onConfirm = {
+                showDiscard = false
+                onBack()
+            },
+            onDismiss = { showDiscard = false },
+            destructive = true,
+        )
+    }
+
+    // Device back button goes through the same unsaved-changes guard. Let an
+    // open picker/dialog handle back itself instead of navigating underneath it.
+    BackHandler(
+        enabled = !startPicker && !endPicker && !showDiscard && !form.loadFailed &&
+            errorMessage == null && successMessage == null && conflict == null,
+    ) { handleBack() }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -13,10 +13,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,7 +39,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.app.easyremind.util.ScheduleMath
 import com.app.easyremind.ui.theme.MediumShape
 import java.time.DayOfWeek
@@ -46,6 +51,7 @@ fun NeoLabeledField(
     modifier: Modifier = Modifier,
     placeholder: String = "",
     singleLine: Boolean = true,
+    leadingIcon: @Composable (() -> Unit)? = null,
 ) {
     Column(modifier = modifier) {
         Text(
@@ -68,6 +74,7 @@ fun NeoLabeledField(
             },
             singleLine = singleLine,
             shape = MediumShape,
+            leadingIcon = leadingIcon,
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = MaterialTheme.colorScheme.surface,
                 unfocusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -109,6 +116,13 @@ fun NeoTimeField(label: String, value: String, onClick: () -> Unit, modifier: Mo
                 color = if (value.isEmpty())
                     MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 else MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector = Icons.Default.Schedule,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
             )
         }
     }
@@ -237,7 +251,7 @@ fun NeoDropdown(
         Spacer(Modifier.height(6.dp))
         var expanded by remember { mutableStateOf(false) }
         val (dark, light) = neoShadowColors()
-        Box(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .softCard(MediumShape, dark, light, offset = 3.dp, elevation = 5.dp)
@@ -245,11 +259,21 @@ fun NeoDropdown(
                 .clip(MediumShape)
                 .clickable { expanded = true }
                 .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
                 text = value,
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+            Icon(
+                imageVector = Icons.Default.ArrowDropDown,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         DropdownMenu(
@@ -277,6 +301,7 @@ fun NeoMessageDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     destructive: Boolean = false,
+    showDismissButton: Boolean = true,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -293,9 +318,9 @@ fun NeoMessageDialog(
                 Text(confirmText, fontWeight = FontWeight.SemiBold)
             }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        },
+        dismissButton = if (showDismissButton) {
+            { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        } else null,
     )
 }
 
@@ -309,7 +334,14 @@ fun NeoConfirmDeleteDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(24.dp),
         containerColor = MaterialTheme.colorScheme.surface,
-        icon = { Text("🗑️", fontSize = 28.sp) },
+        icon = {
+            Icon(
+                imageVector = Icons.Default.DeleteOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(28.dp),
+            )
+        },
         title = { Text("Delete Class?", fontWeight = FontWeight.Bold) },
         text = {
             Text(
@@ -338,7 +370,14 @@ fun NeoConflictDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(24.dp),
         containerColor = MaterialTheme.colorScheme.surface,
-        icon = { Text("⚠️", fontSize = 28.sp) },
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp),
+            )
+        },
         title = { Text("Schedule Conflict", fontWeight = FontWeight.Bold) },
         text = {
             Column {

@@ -9,11 +9,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.app.easyremind.data.ClassEntity
+import com.app.easyremind.ui.components.animateEnter
 import com.app.easyremind.ui.components.NeoButton
 import com.app.easyremind.ui.components.NeoCard
 import com.app.easyremind.ui.components.NeoConfirmDeleteDialog
@@ -47,7 +50,9 @@ fun ClassDetailsScreen(
 ) {
     val clazz by viewModel.classState.collectAsStateWithLifecycle()
     var showDelete by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    var toggleError by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    var actionError by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    // message -> whether the screen should close after acknowledgement
+    var feedback by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<Pair<String, Boolean>?>(null) }
 
     Column(
         modifier = modifier
@@ -57,7 +62,8 @@ fun ClassDetailsScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 6.dp),
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+                .animateEnter(delayMs = 0),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
@@ -92,7 +98,8 @@ fun ClassDetailsScreen(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 20.dp)
+                .animateEnter(delayMs = 80),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Spacer(Modifier.height(4.dp))
@@ -142,7 +149,12 @@ fun ClassDetailsScreen(
                     Switch(
                         checked = c.isEnabled,
                         onCheckedChange = { enabled ->
-                            viewModel.toggleEnabled(c, enabled, onError = { toggleError = it })
+                            viewModel.toggleEnabled(
+                                clazz = c,
+                                enabled = enabled,
+                                onError = { actionError = it },
+                                onSuccess = { msg -> feedback = msg to false },
+                            )
                         },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
@@ -153,13 +165,32 @@ fun ClassDetailsScreen(
             }
 
             Spacer(Modifier.height(4.dp))
-            NeoButton(text = "Edit Class", onClick = { onEdit(c.id) })
+            NeoButton(
+                text = "Edit Class",
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
+                },
+                onClick = { onEdit(c.id) },
+                modifier = Modifier.animateEnter(delayMs = 160),
+            )
             Spacer(Modifier.height(4.dp))
             NeoButton(
                 text = "Delete Class",
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.DeleteOutline,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
+                },
                 onClick = { showDelete = true },
                 containerColor = MaterialTheme.colorScheme.error,
                 contentColor = MaterialTheme.colorScheme.onError,
+                modifier = Modifier.animateEnter(delayMs = 200),
             )
             Spacer(Modifier.height(32.dp))
         }
@@ -171,20 +202,43 @@ fun ClassDetailsScreen(
             subject = target?.subjectName.orEmpty(),
             onConfirm = {
                 showDelete = false
-                target?.let { viewModel.delete(it.id) }
-                onDeleted()
+                target?.let { deleted ->
+                    viewModel.delete(
+                        id = deleted.id,
+                        onDeleted = { feedback = "Class deleted successfully." to true },
+                        onError = { actionError = it },
+                    )
+                }
             },
             onDismiss = { showDelete = false },
         )
     }
 
-    toggleError?.let { message ->
+    actionError?.let { message ->
         NeoMessageDialog(
-            title = "Could not update",
+            title = "Something went wrong",
             message = message,
             confirmText = "OK",
-            onConfirm = { toggleError = null },
-            onDismiss = { toggleError = null },
+            onConfirm = { actionError = null },
+            onDismiss = { actionError = null },
+            showDismissButton = false,
+        )
+    }
+
+    feedback?.let { (message, closeScreen) ->
+        NeoMessageDialog(
+            title = "Success",
+            message = message,
+            confirmText = "OK",
+            onConfirm = {
+                feedback = null
+                if (closeScreen) onDeleted()
+            },
+            onDismiss = {
+                feedback = null
+                if (closeScreen) onDeleted()
+            },
+            showDismissButton = false,
         )
     }
 }

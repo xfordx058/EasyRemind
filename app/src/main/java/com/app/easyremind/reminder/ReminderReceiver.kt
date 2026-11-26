@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.app.easyremind.data.AppDatabase
+import com.app.easyremind.util.ScheduleMath
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -24,15 +25,17 @@ class ReminderReceiver : BroadcastReceiver() {
                 val db = AppDatabase.get(context)
                 val clazz = db.classDao().getById(classId)
                 val now = LocalDateTime.now()
+                val settings = db.settingsDao().get()
                 if (clazz == null || !clazz.isEnabled) return@launch
+                if (settings != null && !settings.notificationsEnabled) return@launch
 
                 val occurrence = LocalDate.ofEpochDay(
                     intent.getLongExtra(ReminderScheduler.EXTRA_OCCURRENCE_DAY, now.toLocalDate().toEpochDay())
                 )
-                val end = occurrence.atTime(clazz.endMin / 60, clazz.endMin % 60)
+                val end = ScheduleMath.atTimeOn(occurrence, clazz.endMin)
                 if (now.isAfter(end)) return@launch
 
-                val start = occurrence.atTime(clazz.startMin / 60, clazz.startMin % 60)
+                val start = ScheduleMath.atTimeOn(occurrence, clazz.startMin)
                 val minutesUntil = ChronoUnit.MINUTES.between(now, start)
 
                 Notifier(context).showClassReminder(clazz, minutesUntil)

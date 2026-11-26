@@ -37,19 +37,29 @@ class FocusService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (store.status != TimerStatus.Running) {
+        if (store.status == TimerStatus.Idle) {
             store.reset()
             stopSelf()
             return START_NOT_STICKY
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(Notifier.TICKER_ID, buildTickerNotification(), FOREGROUND_TYPE ?: 0)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(
+                Notifier.TICKER_ID,
+                buildTickerNotification(),
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+            )
         } else {
             startForeground(Notifier.TICKER_ID, buildTickerNotification())
         }
         handler.removeCallbacks(tick)
-        handler.post(tick)
+        if (store.status == TimerStatus.Running) {
+            handler.post(tick)
+        } else {
+            // The service may be recreated while the timer is paused; keep the
+            // paused state instead of throwing the remaining time away.
+            notifier.sendFocusTicker(store.status, label(), formatRemaining(store.remainingMs()))
+        }
         return START_STICKY
     }
 
@@ -79,15 +89,25 @@ class FocusService : Service() {
     private fun completeSession() {
         handler.removeCallbacks(tick)
         val wasFocus = store.complete()
-        val app = store.sessionsCompleted
+        // Post everything before stopping: onDestroy cancels this scope, so a
+        // fire-and-forget notification here could silently disappear.
         scope.launch {
+            val settings = (application as com.app.easyremind.EasyRemindApp)
+                .container.repository.getSettings()
+            val longBreakDue = wasFocus &&
+                settings.sessionCount > 0 &&
+                store.sessionsCompleted % settings.sessionCount == 0
             notifier.showFocusComplete(
                 isBreak = !wasFocus,
-                breakLabel = if (wasFocus) "short break" else "next focus start",
+                breakLabel = when {
+                    !wasFocus -> "next focus start"
+                    longBreakDue -> "long break"
+                    else -> "short break"
+                },
             )
+            notifier.cancelFocusTicker()
+            stopSelf()
         }
-        notifier.cancelFocusTicker()
-        stopSelf()
     }
 
     private fun label(): String = when (store.mode) {
@@ -115,16 +135,6 @@ class FocusService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
-        // specialUse is API 34+. Fall back for older devices.
-        private val FOREGROUND_TYPE: Int? = getForegroundType()
-
-        private fun getForegroundType(): Int? =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-            } else {
-                null
-            }
-
         fun start(context: Context) {
             val intent = Intent(context, FocusService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

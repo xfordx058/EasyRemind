@@ -15,8 +15,21 @@ data class ScheduleUiState(
     val classes: List<ClassEntity> = emptyList(),
     val settings: SettingsEntity = SettingsEntity(),
     val selectedDay: DayOfWeek? = LocalDate.now().dayOfWeek,
+    val searchQuery: String = "",
 ) {
     val gridMode: Boolean get() = settings.scheduleView == "grid"
+    val hasActiveSearch: Boolean get() = searchQuery.isNotBlank()
+
+    val filteredClasses: List<ClassEntity>
+        get() {
+            val query = searchQuery.trim()
+            if (query.isEmpty()) return classes
+            return classes.filter { clazz ->
+                clazz.subjectName.contains(query, ignoreCase = true) ||
+                    clazz.instructor.contains(query, ignoreCase = true) ||
+                    clazz.room.contains(query, ignoreCase = true)
+            }
+        }
 }
 
 class ScheduleViewModel(app: Application) : AndroidViewModel(app) {
@@ -43,10 +56,15 @@ class ScheduleViewModel(app: Application) : AndroidViewModel(app) {
         _uiState.value = _uiState.value.copy(selectedDay = day)
     }
 
+    fun setSearchQuery(query: String) {
+        _uiState.value = _uiState.value.copy(searchQuery = query)
+    }
+
     fun setViewMode(grid: Boolean) {
-        val s = _uiState.value.settings
         viewModelScope.launch {
-            repository.updateSettings(s.copy(scheduleView = if (grid) "grid" else "list"))
+            val settings = repository.getSettings()
+                .copy(scheduleView = if (grid) "grid" else "list")
+            repository.updateSettings(settings)
         }
     }
 }

@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -39,6 +41,7 @@ import com.app.easyremind.focus.FocusUiState
 import com.app.easyremind.focus.FocusViewModel
 import com.app.easyremind.focus.TimerMode
 import com.app.easyremind.focus.TimerStatus
+import com.app.easyremind.ui.components.animateEnter
 import com.app.easyremind.ui.components.NeoButton
 import com.app.easyremind.ui.components.NeoIconButton
 import com.app.easyremind.ui.components.NeoSegmentedToggle
@@ -59,7 +62,7 @@ fun FocusScreen(
             state = state,
             onStartBreak = {
                 viewModel.dismissCompletion()
-                viewModel.setMode(TimerMode.Short)
+                viewModel.setMode(state.suggestedBreak)
                 viewModel.startCurrentMode()
             },
             onBackHome = {
@@ -81,7 +84,7 @@ fun FocusScreen(
             text = "Focus",
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().animateEnter(delayMs = 0),
         )
         Spacer(Modifier.height(18.dp))
 
@@ -106,11 +109,12 @@ fun FocusScreen(
         }
 
         Spacer(Modifier.height(32.dp))
-        TimerRing(state = state)
+        TimerRing(state = state, modifier = Modifier.animateEnter(delayMs = 120))
         Spacer(Modifier.height(16.dp))
 
         Text(
             text = when {
+                state.status == TimerStatus.Running && state.mode == TimerMode.Long -> "LONG BREAK"
                 state.status == TimerStatus.Running && state.isBreak -> "SHORT BREAK"
                 state.status == TimerStatus.Running -> "FOCUS SESSION"
                 state.status == TimerStatus.Paused -> "PAUSED"
@@ -138,8 +142,15 @@ fun FocusScreen(
             TimerStatus.Idle -> {
                 NeoButton(
                     text = "Start",
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    },
                     onClick = viewModel::startCurrentMode,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().animateEnter(delayMs = 200),
                 )
                 Spacer(Modifier.height(16.dp))
             }
@@ -152,7 +163,8 @@ fun FocusScreen(
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(60.dp),
+                            .height(60.dp)
+                            .animateEnter(delayMs = 200),
                         contentAlignment = Alignment.Center,
                     ) {
                         NeoIconButton(
@@ -171,7 +183,8 @@ fun FocusScreen(
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(60.dp),
+                            .height(60.dp)
+                            .animateEnter(delayMs = 200),
                         contentAlignment = Alignment.Center,
                     ) {
                         NeoIconButton(
@@ -198,13 +211,27 @@ fun FocusScreen(
                 ) {
                     NeoButton(
                         text = "Resume",
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        },
                         onClick = viewModel::resume,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).animateEnter(delayMs = 200),
                     )
                     NeoButton(
                         text = "Reset",
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        },
                         onClick = viewModel::reset,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).animateEnter(delayMs = 240),
                         containerColor = MaterialTheme.colorScheme.surface,
                         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -228,7 +255,7 @@ fun FocusScreen(
 }
 
 @Composable
-private fun TimerRing(state: FocusUiState) {
+private fun TimerRing(state: FocusUiState, modifier: Modifier = Modifier) {
     val (dark, light) = neoShadowColors()
     val ringSize = 240.dp
     val stroke = 16.dp
@@ -239,7 +266,7 @@ private fun TimerRing(state: FocusUiState) {
         TimerMode.Long -> MaterialTheme.colorScheme.tertiary
     }
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(ringSize)
             .padding(20.dp),
         contentAlignment = Alignment.Center,
@@ -305,8 +332,12 @@ private fun SessionCompleteCard(
     onBackHome: () -> Unit,
 ) {
     val isBreakDone = state.lastCompletedMode == TimerMode.Short ||
-        state.lastCompletedMode == TimerMode.Long ||
-        state.isBreak
+        state.lastCompletedMode == TimerMode.Long
+    val breakMinutes = if (state.suggestedBreak == TimerMode.Long) {
+        state.longBreakDuration
+    } else {
+        state.shortBreakDuration
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -315,7 +346,12 @@ private fun SessionCompleteCard(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.weight(0.6f))
-        Text(text = "🎉", fontSize = 56.sp)
+        Icon(
+            imageVector = Icons.Default.CheckCircle,
+            contentDescription = "Completed",
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(72.dp).animateEnter(delayMs = 0),
+        )
         Spacer(Modifier.height(16.dp))
         Text(
             text = if (isBreakDone) "Break Complete" else "Focus Session Complete",
@@ -329,7 +365,7 @@ private fun SessionCompleteCard(
             text = if (isBreakDone) {
                 "Great work! Ready for your next focus session."
             } else {
-                "Great work!\n\nTime for a ${state.shortBreakDuration}-minute break."
+                "Great work!\n\nTime for a $breakMinutes-minute ${if (state.suggestedBreak == TimerMode.Long) "long" else "short"} break."
             },
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -338,13 +374,28 @@ private fun SessionCompleteCard(
         Spacer(Modifier.weight(0.8f))
         if (!isBreakDone) {
             NeoButton(
-                text = "Start Break",
+                text = if (state.suggestedBreak == TimerMode.Long) "Start Long Break" else "Start Break",
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
+                },
                 onClick = onStartBreak,
+                modifier = Modifier.animateEnter(delayMs = 160),
             )
             Spacer(Modifier.height(8.dp))
         }
-        Box(modifier = Modifier.padding(8.dp)) {
+        Box(modifier = Modifier.padding(8.dp).animateEnter(delayMs = 200)) {
             androidx.compose.material3.TextButton(onClick = onBackHome) {
+                Icon(
+                    imageVector = Icons.Default.Home,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.size(6.dp))
                 Text("Back to Home", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

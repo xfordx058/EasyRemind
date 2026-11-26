@@ -11,6 +11,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -20,8 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.app.easyremind.ui.components.AppLogo
+import com.app.easyremind.ui.components.animateEnter
 import com.app.easyremind.ui.components.NeoButton
 
 @Composable
@@ -41,11 +45,13 @@ fun PermissionScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.weight(0.6f))
-        AppLogo(size = 100.dp)
+        AppLogo(size = 100.dp, modifier = Modifier.animateEnter(delayMs = 0))
         Spacer(Modifier.height(32.dp))
-        Text(
-            text = "🔔",
-            fontSize = 40.sp,
+        Icon(
+            imageVector = Icons.Default.Notifications,
+            contentDescription = "Notifications",
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(44.dp).animateEnter(delayMs = 80),
         )
         Spacer(Modifier.height(8.dp))
         Text(
@@ -53,6 +59,7 @@ fun PermissionScreen(
             style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.onBackground,
             fontWeight = FontWeight.Bold,
+            modifier = Modifier.animateEnter(delayMs = 120),
         )
         Spacer(Modifier.height(12.dp))
         Text(
@@ -64,6 +71,14 @@ fun PermissionScreen(
         Spacer(Modifier.weight(0.9f))
         NeoButton(
             text = "Allow Notifications",
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Notifications,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+            },
+            modifier = Modifier.animateEnter(delayMs = 200),
             onClick = {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     launcher.launch(Manifest.permission.POST_NOTIFICATIONS)

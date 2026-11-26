@@ -20,15 +20,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.WavingHand
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -36,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -52,6 +56,7 @@ import com.app.easyremind.ui.components.NeoButton
 import com.app.easyremind.ui.components.NeoCard
 import com.app.easyremind.ui.components.NeoIconButton
 import com.app.easyremind.ui.components.EmptyState
+import com.app.easyremind.ui.components.animateEnter
 import com.app.easyremind.ui.viewmodel.HomeUiState
 import com.app.easyremind.util.ScheduleMath
 import java.time.format.DateTimeFormatter
@@ -66,6 +71,9 @@ fun HomeScreen(
     onOpenNotificationSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Cards animate only the first time they appear, not every time they
+    // scroll back into the viewport.
+    val animatedCards = remember { mutableSetOf<Long>() }
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -77,16 +85,25 @@ fun HomeScreen(
     ) {
         item(key = "header") {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().animateEnter(delayMs = 0),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column {
-                    Text(
-                        text = "${state.greeting} 👋",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = state.greeting,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+                        Spacer(Modifier.size(6.dp))
+                        Icon(
+                            imageVector = Icons.Default.WavingHand,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                     Spacer(Modifier.height(2.dp))
                     Text(
                         text = state.dateLabel,
@@ -121,8 +138,19 @@ fun HomeScreen(
                     },
                     title = "No classes yet",
                     subtitle = "Add your first class\nto start your schedule.",
+                    modifier = Modifier.animateEnter(delayMs = 80),
                     action = {
-                        NeoButton(text = "+ Add Class", onClick = onAddClass)
+                        NeoButton(
+                            text = "Add Class",
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            },
+                            onClick = onAddClass,
+                        )
                     },
                 )
             }
@@ -134,13 +162,14 @@ fun HomeScreen(
                 state = state,
                 onOpenClass = onOpenClass,
                 onOpenSchedule = onOpenSchedule,
+                modifier = Modifier.animateEnter(delayMs = 80),
             )
         }
 
         if (state.todaysClasses.isNotEmpty()) {
             item(key = "today_header") {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().animateEnter(delayMs = 120),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -151,16 +180,29 @@ fun HomeScreen(
                     )
                     TextButton(onClick = onOpenSchedule) {
                         Text("See all", color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.size(4.dp))
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
+                        )
                     }
                 }
             }
-            items(
+            itemsIndexed(
                 items = state.todaysClasses,
-                key = { it.id }
-            ) { clazz ->
+                key = { _, clazz -> clazz.id },
+            ) { index, clazz ->
+                val firstAppearance = remember(clazz.id) { animatedCards.add(clazz.id) }
                 CompactClassCard(
                     clazz = clazz,
                     nowMin = state.nowMin,
+                    showInstructor = state.settings.showInstructor,
+                    showRoom = state.settings.showRoom,
+                    modifier = if (firstAppearance) {
+                        Modifier.animateEnter(delayMs = 160 + minOf(index * 40, 200))
+                    } else Modifier,
                     onClick = { onOpenClass(clazz.id) },
                 )
             }
@@ -173,6 +215,7 @@ private fun NextClassHero(
     state: HomeUiState,
     onOpenClass: (Long) -> Unit,
     onOpenSchedule: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val primary = MaterialTheme.colorScheme.primary
     when (val next = state.next) {
@@ -187,6 +230,7 @@ private fun NextClassHero(
                 accent = primary,
                 progress = ((state.nowMin - clazz.startMin).toFloat() / totalMin).coerceIn(0f, 1f),
                 onClick = { onOpenClass(clazz.id) },
+                modifier = modifier,
             )
         }
         is ScheduleMath.NextClass.Upcoming -> HeroCard(
@@ -204,17 +248,19 @@ private fun NextClassHero(
             accent = primary,
             progress = null,
             onClick = { onOpenClass(next.clazz.id) },
+            modifier = modifier,
         )
         ScheduleMath.NextClass.NoClasses -> {
             val anyEnabled = state.classes.any { it.isEnabled }
             EmptyHero(
-                title = if (anyEnabled) "You're all done! ✓" else "Nothing scheduled",
+                title = if (anyEnabled) "You're all done!" else "Nothing scheduled",
                 subtitle = if (anyEnabled) {
                     "No more classes scheduled for today.\nEnjoy your free time!"
                 } else {
                     "No classes are turned on right now.\nEnable one from Schedule."
                 },
                 onClick = onOpenSchedule,
+                modifier = modifier,
             )
         }
     }
@@ -229,9 +275,10 @@ private fun HeroCard(
     live: Boolean,
     progress: Float?,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     NeoCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         color = if (progress != null) accent.copy(alpha = 0.10f)
         else MaterialTheme.colorScheme.surface,
         contentPadding = 18.dp,
@@ -367,8 +414,13 @@ private fun LiveDot(accent: Color) {
 }
 
 @Composable
-private fun EmptyHero(title: String, subtitle: String, onClick: () -> Unit) {
-    NeoCard(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
+private fun EmptyHero(
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    NeoCard(modifier = modifier.fillMaxWidth(), onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = Icons.Default.CheckCircle,
@@ -398,12 +450,15 @@ private fun EmptyHero(title: String, subtitle: String, onClick: () -> Unit) {
 fun CompactClassCard(
     clazz: ClassEntity,
     nowMin: Int,
+    showInstructor: Boolean = true,
+    showRoom: Boolean = true,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val isActive = clazz.startMin <= nowMin && nowMin < clazz.endMin
     val accent = if (isActive) MaterialTheme.colorScheme.primary
     else MaterialTheme.colorScheme.onSurfaceVariant
-    NeoCard(modifier = Modifier.fillMaxWidth(), onClick = onClick, contentPadding = 14.dp) {
+    NeoCard(modifier = modifier.fillMaxWidth(), onClick = onClick, contentPadding = 14.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.width(64.dp)) {
                 Text(
@@ -422,8 +477,8 @@ fun CompactClassCard(
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = listOfNotNull(
-                        clazz.room.takeIf { it.isNotBlank() },
-                        clazz.instructor.takeIf { it.isNotBlank() },
+                        clazz.room.takeIf { showRoom && it.isNotBlank() },
+                        clazz.instructor.takeIf { showInstructor && it.isNotBlank() },
                     ).joinToString("  ·  "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

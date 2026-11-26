@@ -23,9 +23,10 @@ data class FocusUiState(
     val shortBreakDuration: Int = 5,
     val longBreakDuration: Int = 15,
     val sessionCount: Int = 4,
+    val suggestedBreak: TimerMode = TimerMode.Short,
 ) {
     val isBreak: Boolean get() = mode != TimerMode.Focus
-    val sessionNumber: Int get() = (sessionsCompleted % sessionCount).coerceAtLeast(0) + 1
+    val sessionNumber: Int get() = (sessionsCompleted % sessionCount.coerceAtLeast(1)) + 1
     val progress: Float
         get() = if (totalMs <= 0L) 0f else (remainingMs.toFloat() / totalMs.toFloat()).coerceIn(0f, 1f)
 }
@@ -63,11 +64,24 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun buildState(): FocusUiState {
         val s = settingsCache.value ?: SettingsEntity()
+        val status = store.status
+        // An untouched timer has no stored duration; show the configured one
+        // so the UI never starts at 00:00.
+        val idleDurationMs = when (store.mode) {
+            TimerMode.Focus -> s.focusDuration
+            TimerMode.Short -> s.shortBreakDuration
+            TimerMode.Long -> s.longBreakDuration
+        }.toLong() * 60_000L
+        val showIdleDuration = status == TimerStatus.Idle && store.totalMs <= 0L
+        val longBreakDue = store.lastCompletedMode == TimerMode.Focus &&
+            store.sessionsCompleted > 0 &&
+            s.sessionCount > 0 &&
+            store.sessionsCompleted % s.sessionCount == 0
         return FocusUiState(
             mode = store.mode,
-            status = store.status,
-            remainingMs = store.remainingMs(),
-            totalMs = store.totalMs,
+            status = status,
+            remainingMs = if (showIdleDuration) idleDurationMs else store.remainingMs(),
+            totalMs = if (showIdleDuration) idleDurationMs else store.totalMs,
             sessionsCompleted = store.sessionsCompleted,
             completionSeq = store.completionSeq,
             lastCompletedMode = store.lastCompletedMode,
@@ -75,6 +89,7 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
             shortBreakDuration = s.shortBreakDuration,
             longBreakDuration = s.longBreakDuration,
             sessionCount = s.sessionCount,
+            suggestedBreak = if (longBreakDue) TimerMode.Long else TimerMode.Short,
         )
     }
 
@@ -111,7 +126,9 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setMode(mode: TimerMode) {
-        if (store.status == TimerStatus.Running) return
+        // Changing mode while paused used to leave a stale end time and an
+        // empty remaining duration, which completed the new timer instantly.
+        if (store.status != TimerStatus.Idle) return
         store.mode = mode
         store.totalMs = 0L
         store.remainingWhenPausedMs = 0L

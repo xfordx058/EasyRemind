@@ -27,19 +27,30 @@ class ClassDetailViewModel(app: Application, classId: Long) : AndroidViewModel(a
         }
     }
 
-    fun toggleEnabled(clazz: ClassEntity, enabled: Boolean, onError: (String) -> Unit) {
+    fun toggleEnabled(
+        clazz: ClassEntity,
+        enabled: Boolean,
+        onError: (String) -> Unit,
+        onSuccess: (String) -> Unit,
+    ) {
         viewModelScope.launch {
             try {
                 repository.setEnabled(clazz, enabled)
+                onSuccess(if (enabled) "Reminders enabled." else "Reminders disabled.")
             } catch (e: Exception) {
                 onError(e.message ?: "Something went wrong.")
             }
         }
     }
 
-    fun delete(id: Long) {
+    fun delete(id: Long, onDeleted: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
-            repository.deleteClass(id)
+            try {
+                repository.deleteClass(id)
+                onDeleted()
+            } catch (e: Exception) {
+                onError(e.message ?: "Could not delete the class.")
+            }
         }
     }
 

@@ -20,7 +20,8 @@ object ScheduleMath {
     const val SUN = 1 shl 6
 
     val dayNames = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
-    val dayShort = listOf("S", "M", "T", "W", "T", "F", "S")
+    // Indexed by DayOfWeek.value - 1, i.e. Monday first.
+    val dayShort = listOf("M", "T", "W", "T", "F", "S", "S")
 
     private val timeFormat = DateTimeFormatter.ofPattern("h:mm a", Locale.US)
 
@@ -35,8 +36,17 @@ object ScheduleMath {
 
     fun bitmaskOf(vararg days: DayOfWeek): Int = bitmaskOf(days.toSet())
 
+    /** 24:00 is a valid end time (a class ending exactly at midnight). */
+    fun isEndOfDay(minutes: Int): Boolean = minutes == 1440
+
+    /** Minute-of-day -> date/time. 1440 rolls to midnight at the end of [date]. */
+    fun atTimeOn(date: LocalDate, minutes: Int): LocalDateTime =
+        if (isEndOfDay(minutes)) date.plusDays(1).atStartOfDay()
+        else date.atTime(minutes / 60, minutes % 60)
+
     fun formatTime(minutes: Int): String =
-        LocalTime.of(minutes / 60, minutes % 60).format(timeFormat)
+        if (isEndOfDay(minutes)) "12:00 AM"
+        else LocalTime.of(minutes / 60, minutes % 60).format(timeFormat)
 
     fun formatTimeRange(startMin: Int, endMin: Int): String =
         "${formatTime(startMin)} – ${formatTime(endMin)}"
@@ -62,20 +72,29 @@ object ScheduleMath {
 
     /** Minutes between now and the given start (of the same/any day). */
     fun minutesUntil(now: LocalDateTime, occurrence: LocalDate, startMin: Int): Long =
-        ChronoUnit.MINUTES.between(now, occurrence.atTime(startMin / 60, startMin % 60))
+        ChronoUnit.MINUTES.between(now, atTimeOn(occurrence, startMin))
 
     fun minutesEnding(now: LocalDateTime, occurrence: LocalDate, endMin: Int): Long =
-        ChronoUnit.MINUTES.between(now, occurrence.atTime(endMin / 60, endMin % 60))
+        ChronoUnit.MINUTES.between(now, atTimeOn(occurrence, endMin))
 
-    /** Next weekday equal to [day] on/after [start] such that start time is in the future at [now]. */
-    fun nextOccurrence(now: LocalDateTime, day: DayOfWeek, startMin: Int): LocalDate {
+    /**
+     * Next date for [day] whose reminder time is still in the future at [now].
+     * [leadMinutes] is the reminder offset, so a class starting soon enough
+     * that its reminder time has already passed is skipped to the next week.
+     */
+    fun nextOccurrence(
+        now: LocalDateTime,
+        day: DayOfWeek,
+        startMin: Int,
+        leadMinutes: Int = 0,
+    ): LocalDate {
         val today = now.toLocalDate()
         val todayMinutes = now.hour * 60 + now.minute
         var candidate = today
         var guard = 0
         while (guard < 8) {
             if (candidate.dayOfWeek == day) {
-                if (candidate != today || startMin > todayMinutes) return candidate
+                if (candidate != today || startMin - leadMinutes > todayMinutes) return candidate
             }
             candidate = candidate.plusDays(1)
             guard++

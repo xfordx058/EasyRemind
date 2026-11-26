@@ -18,19 +18,19 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch {
+            _settings.value = repository.getSettings()
             repository.settingsFlow.collect { _settings.value = it }
         }
     }
 
     fun update(transform: (SettingsEntity) -> SettingsEntity) {
-        val current = _settings.value ?: SettingsEntity()
-        val next = transform(current)
         viewModelScope.launch {
+            // Read the persisted value instead of a possibly-stale flow value,
+            // otherwise a quick second toggle can undo the first one.
+            val next = transform(repository.getSettings())
             repository.updateSettings(next)
-            getApplication<com.app.easyremind.EasyRemindApp>().container.notifier.apply {
-                updateChannels(next.soundEnabled, next.vibrationEnabled)
-            }
-            _settings.value = next
+            getApplication<com.app.easyremind.EasyRemindApp>().container.notifier
+                .updateChannels(next.soundEnabled, next.vibrationEnabled)
         }
     }
 
